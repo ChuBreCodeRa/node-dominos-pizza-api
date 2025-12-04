@@ -1,6 +1,5 @@
 import fetch from 'node-fetch';
 import { urls } from '../utils/urls.js';
-import { get } from '../utils/api-json.js';
 import Customer from './Customer.js';
 import fs from 'fs';
 import path from 'path';
