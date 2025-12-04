@@ -371,31 +371,33 @@ class Account {
             if (!fs.existsSync(filePath)) {
                 return false;
             }
-            
+
             const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-            
+
             // Load refresh token if available
             if (data.refreshToken) {
                 this.refreshToken = data.refreshToken;
             }
-            
+
             if (data.token) {
                 this.token = data.token;
                 this.#parseToken();
-                
+
                 // Check if loaded token is still valid
                 if (!this.isTokenValid()) {
                     console.warn('Loaded access token has expired');
                     // Still return true if we have a refresh token
                     return !!this.refreshToken;
                 }
-                
+
                 return true;
             }
-            
+
             // Return true if we at least have a refresh token
             return !!this.refreshToken;
         } catch (e) {
+            // Log unexpected errors (parse errors, permission errors, etc.)
+            console.warn(`Failed to load token from ${filePath}: ${e.message}`);
             return false;
         }
     }
