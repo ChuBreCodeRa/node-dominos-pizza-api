@@ -1,120 +1,159 @@
 import {Account} from '../../index.js';
-import {Customer} from '../../index.js';
-import IsDominos from '../../utils/DominosTypes.js';
-
-const isDominos=new IsDominos;
 
 const runTest=async function(test){
-    // Test 1: Initialization
+    // Test 1: Initialization with default options
     try{
-        test.expects(`Account to initialize properly`);    
-        const account = new Account({
-            email: 'test@example.com',
-            password: 'password123',
-            customer: {
-                firstName: 'John',
-                lastName: 'Doe',
-                email: 'test@example.com'
-            }
-        });
-        
-        if(account.email !== 'test@example.com') test.fail();
-        if(account.password !== 'password123') test.fail();
-        isDominos.customer(account.customer);
-        
-    }catch(err){
-        console.trace(err);
-        test.fail();
-    }
-    test.pass();
-    test.done();
-
-    // Test 2: Token initialization and parsing
-    try{
-        test.expects(`Account to parse JWT token and extract customer info`);    
-        // Sample JWT structure (not a real token, just for testing parsing)
-        const samplePayload = {
-            CustomerID: 'test-customer-123',
-            Email: 'parsed@example.com',
-            exp: Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
-        };
-        const encodedPayload = Buffer.from(JSON.stringify(samplePayload)).toString('base64');
-        const fakeToken = `header.${encodedPayload}.signature`;
-        
-        const account = new Account({ token: fakeToken });
-        
-        if(account.customerId !== 'test-customer-123') test.fail();
-        if(account.email !== 'parsed@example.com') test.fail();
-        if(!account.isTokenValid()) test.fail();
-        
-    }catch(err){
-        console.trace(err);
-        test.fail();
-    }
-    test.pass();
-    test.done();
-
-    // Test 3: setToken method
-    try{
-        test.expects(`Account.setToken to handle Bearer+ prefix`);    
+        test.expects(`Account to initialize with default options`);    
         const account = new Account();
         
-        const samplePayload = {
-            CustomerID: 'settoken-test-456',
-            Email: 'settoken@example.com',
-            exp: Math.floor(Date.now() / 1000) + 3600
-        };
-        const encodedPayload = Buffer.from(JSON.stringify(samplePayload)).toString('base64');
-        const fakeToken = `header.${encodedPayload}.signature`;
-        
-        // Test with Bearer+ prefix (as it appears in cookies)
-        account.setToken('Bearer+' + fakeToken);
-        
-        if(account.customerId !== 'settoken-test-456') test.fail();
-        if(account.email !== 'settoken@example.com') test.fail();
+        if(account.accessToken !== null) test.fail();
+        if(account.refreshToken !== null) test.fail();
+        if(account.tokenPath !== '.dominos-token') test.fail();
         
     }catch(err){
-        console.trace(err);
         test.fail();
     }
     test.pass();
     test.done();
 
-    // Test 4: Token expiration check
+    // Test 2: Initialization with custom options
     try{
-        test.expects(`Account.isTokenValid to return false for expired token`);    
-        const expiredPayload = {
-            CustomerID: 'expired-customer',
-            Email: 'expired@example.com',
-            exp: Math.floor(Date.now() / 1000) - 3600 // 1 hour ago
-        };
-        const encodedPayload = Buffer.from(JSON.stringify(expiredPayload)).toString('base64');
-        const expiredToken = `header.${encodedPayload}.signature`;
-        
-        const account = new Account({ token: expiredToken });
-        
-        if(account.isTokenValid()) test.fail(); // Should be false for expired token
-        
-    }catch(err){
-        console.trace(err);
-        test.fail();
-    }
-    test.pass();
-    test.done();
-
-    // Test 5: getPoints without login should throw
-    try{
-        test.expects(`Account.getPoints to throw if not logged in`);    
+        test.expects(`Account to initialize with custom options`);    
         const account = new Account({
-            email: 'test@example.com',
-            password: 'password123'
+            accessToken: 'test-access-token',
+            refreshToken: 'test-refresh-token',
+            tokenPath: './custom-token-path.json'
         });
+        
+        if(account.accessToken !== 'test-access-token') test.fail();
+        if(account.refreshToken !== 'test-refresh-token') test.fail();
+        if(account.tokenPath !== './custom-token-path.json') test.fail();
+        
+    }catch(err){
+        test.fail();
+    }
+    test.pass();
+    test.done();
+
+    // Test 3: Token expiration check - expired
+    try{
+        test.expects(`Account.isTokenExpired to return true when no expiresAt set`);    
+        const account = new Account();
+        
+        if(!account.isTokenExpired()) test.fail(); // Should be true when not set
+        
+    }catch(err){
+        test.fail();
+    }
+    test.pass();
+    test.done();
+
+    // Test 4: Token expiration check - valid
+    try{
+        test.expects(`Account.isTokenExpired to return false for future expiration`);    
+        const account = new Account();
+        account.expiresAt = Date.now() + 3600000; // 1 hour from now
+        
+        if(account.isTokenExpired()) test.fail(); // Should be false
+        
+    }catch(err){
+        test.fail();
+    }
+    test.pass();
+    test.done();
+
+    // Test 5: getPoints without authentication should throw
+    try{
+        test.expects(`Account.getPoints to throw if not authenticated`);    
+        const account = new Account();
         
         await account.getPoints();
         test.fail(); // Should have thrown
     }catch(err){
-        if(err.message !== 'You must login first to get points.'){
-            console.trace(err);
+        if(err.message !== 'Not authenticated. Please login or refresh token first.'){
+            test.fail();
+        }
+    }
+    test.pass();
+    test.done();
+
+    // Test 6: getInfo returns correct structure
+    try{
+        test.expects(`Account.getInfo to return account information object`);    
+        const account = new Account({
+            accessToken: 'test-token'
+        });
+        account.email = 'test@example.com';
+        account.firstName = 'John';
+        account.lastName = 'Doe';
+        
+        const info = account.getInfo();
+        
+        if(info.email !== 'test@example.com') test.fail();
+        if(info.firstName !== 'John') test.fail();
+        if(info.lastName !== 'Doe') test.fail();
+        if(info.isAuthenticated !== true) test.fail();
+        
+    }catch(err){
+        test.fail();
+    }
+    test.pass();
+    test.done();
+
+    // Test 7: refreshAccessToken without refresh token should throw
+    try{
+        test.expects(`Account.refreshAccessToken to throw without refresh token`);    
+        const account = new Account();
+        
+        await account.refreshAccessToken();
+        test.fail(); // Should have thrown
+    }catch(err){
+        if(err.message !== 'No refresh token available. Please login first.'){
+            test.fail();
+        }
+    }
+    test.pass();
+    test.done();
+
+    // Test 8: saveToken without refresh token should throw
+    try{
+        test.expects(`Account.saveToken to throw without refresh token`);    
+        const account = new Account();
+        
+        account.saveToken();
+        test.fail(); // Should have thrown
+    }catch(err){
+        if(err.message !== 'No refresh token to save'){
+            test.fail();
+        }
+    }
+    test.pass();
+    test.done();
+
+    // Test 9: loadToken with non-existent file should throw
+    try{
+        test.expects(`Account.loadToken to throw for non-existent file`);    
+        const account = new Account();
+        
+        account.loadToken('./non-existent-token-file.json');
+        test.fail(); // Should have thrown
+    }catch(err){
+        if(!err.message.includes('Token file not found')){
+            test.fail();
+        }
+    }
+    test.pass();
+    test.done();
+
+    // Test 10: Path traversal protection
+    try{
+        test.expects(`Account.saveToken to reject path traversal attempts`);    
+        const account = new Account({ refreshToken: 'test-token' });
+        
+        account.saveToken('../../../etc/passwd');
+        test.fail(); // Should have thrown
+    }catch(err){
+        if(err.message !== 'Invalid file path'){
             test.fail();
         }
     }
