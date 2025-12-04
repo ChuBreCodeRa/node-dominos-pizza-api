@@ -257,7 +257,6 @@ class Account {
         }
 
         if (!this.refreshToken) {
-            console.warn('Token expired and no refresh token available');
             return false;
         }
 
